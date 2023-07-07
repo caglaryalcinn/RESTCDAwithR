@@ -1,0 +1,280 @@
+---
+title: "İMDB FİLM ANALYSIS"
+author: "Çağlar Yalçın "
+date: "03 07 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(readxl)
+library(car)
+library(dplyr)
+library("janitor")
+library("readxl")
+library(MASS)
+library(ggplot2)
+films_data <- read.csv2("data.csv")
+set.seed(5)
+films_rows <- sample(1:nrow(films_data),size= 5000)
+films <- films_data[films_rows,]
+films<-clean_names(films)
+filmss<-na.omit(films)
+summary(filmss)
+
+
+
+
+
+
+
+```
+
+
+
+# RESEARCH QUESTION 1
+
+```{r}
+resarch1 <- films %>%  subset(avg_vote >6)
+
+shapiro.test(resarch1$duration)
+hist(resarch1$duration,breaks=100)
+
+q1<-quantile(filmss$duration, .25)
+q3<-quantile(filmss$duration, .75)
+IQR<-IQR(filmss$duration)
+q1
+q3
+IQR
+outlierless<-subset(filmss,filmss$duration > (q1 - 1.5*IQR) & filmss$duration <(q3+1.5*IQR))
+dim(outlierless)
+q1 - 1.5*IQR
+q3+1.5*IQR
+boxplot(filmss$duration)
+filmss_no_outlier<-filmss %>%
+                    filter(duration >(q1 - 1.5*IQR) & duration <(q3+1.5*IQR))
+
+hist(filmss_no_outlier$duration)
+shapiro.test(filmss_no_outlier$duration)
+
+b2<-1/filmss_no_outlier$duration
+hist(b2,breaks=100)
+shapiro.test(b2)
+
+
+
+m2<-boxcox(lm(filmss_no_outlier$duration~1))
+
+
+lambda<-m2$x[which.max(m2$y)]
+lambda
+new_duration<-(filmss_no_outlier$duration^lambda-1)/lambda
+hist(new_duration,breaks=20)
+shapiro.test(new_duration) 
+
+
+
+
+
+
+t.test(resarch1$duration, mu = 90, alternative = "greater")
+
+wilcox.test(resarch1$duration, median=90 ,alt="greater")
+
+```
+
+# RESEARCH QUESTION 2
+
+
+
+```{r}
+
+shapiro.test(films$critics_vote)
+shapiro.test(films$public_vote)
+
+hist(films$critics_vote,col = "blue")
+hist(films$public_vote,col = "pink")
+
+res.ftest <- var.test(films$critics_vote,films$public_vote)
+res.ftest
+
+# varianceler equal değil p küçük
+
+t.test(films$critics_vote,films$public_vote,alternative ="two.sided", conf=0.95, var.equal = F,na.rm=T)
+wilcox.test(films$critics_vote,films$public_vote,alternative = "two.sided",var.equal=F)
+
+
+```
+
+
+
+# RESEARCH QUESTION 3
+
+
+
+```{r}
+
+research3 <- filmss  %>% subset(duration > 180)
+count(research3,country)
+
+pyes<-24/37
+pno<-13/37
+
+prop.test(x=24,n=37,p=0.45,alternative = "greater")
+
+```
+
+
+# RESEARCH QUESTION 4
+
+
+
+```{r}
+a1 <- filmss %>% subset(year <2000)
+a2 <- filmss %>% subset(year>=2000)
+count(a1,genre)
+count(a2,genre)
+
+count(a1)
+count(a2)
+before <- filmss %>% select("genre","year") %>% subset(genre=="Drama")
+```
+
+
+```{r}
+b1 <- c(677*0.304,585*0.309)
+b2 <- c(677,585)
+
+prop.test(b1,b2)
+```
+
+# QUESTION 5
+
+```{r}
+
+plot(filmss$avg_vote,filmss$humor)
+
+shapiro.test(filmss$avg_vote)
+hist(filmss$avg_vote)  
+a<-filmss$avg_vote^2
+hist(a,col = "green")
+shapiro.test(a)
+m<-boxcox(lm(filmss$avg_vote~1))
+##Judging by the probabilityhood graph, OUR LAMBda should be between 1 and 2 with a high probability of 95 percent and close to 1 for the highest probability, but let's find the net value with the help of r 
+
+lambda<-m$x[which.max(m$y)]
+lambda 
+
+new_avg_vote<-(filmss$avg_vote^lambda-1)/lambda
+hist(new_avg_vote,col = "dark green") 
+shapiro.test(new_avg_vote) 
+model<-lm(new_avg_vote~humor,data=filmss)
+
+summary(model)
+
+plot(model, which=2, col=c("red"))##When we look at the residuals, we can say that the distribution of the data is also a problem, and it is left skewed.For our model, the Q-Q plot shows pretty good alignment to the the line with a few points at the top slightly offset. Probably not significant and a reasonable alignment.
+
+
+plot(model, which=1, col=c("blue"))
+##when we look at the plot below, we see that the data does not have any obvious distinct pattern. While it is slightly curved, it has equally spread residuals around the horizontal line without a distinct pattern.
+
+##This is a good indication it is not a non-linear relationship.
+
+summary(model)
+
+
+filmss$predicted <- predict(model)   
+filmss$residuals <- residuals(model)
+ggplot(filmss, aes(x = humor, y = new_avg_vote)) +
+  geom_smooth(method = "lm", se = FALSE, color = "lightgrey") +     
+  geom_segment(aes(xend = humor, yend = predicted), alpha = .2) +     
+  geom_point(aes(color = abs(residuals), size = abs(residuals))) +  
+  scale_color_continuous(low = "green", high = "red") +             
+  guides(color = FALSE, size = FALSE) +                            
+  geom_point(aes(y = predicted), shape = 1) +
+  theme_bw()
+
+
+
+
+
+
+
+```
+
+# QUESTION 6 
+
+```{r}
+plot(filmss$avg_vote,filmss$humor)#
+plot(filmss$avg_vote,filmss$rhythm)
+plot(filmss$avg_vote,filmss$erotism)
+plot(filmss$avg_vote,filmss$tension)##
+plot(filmss$avg_vote,filmss$effort) ##
+plot(filmss$avg_vote,filmss$duration)#
+plot(filmss$avg_vote,filmss$total_votes)
+plot(filmss$avg_vote,filmss$critics_vote)#####
+plot(filmss$avg_vote,filmss$public_vote)#####
+
+
+
+
+model2<-lm(new_avg_vote~humor+rhythm+erotism+tension+effort+duration+total_votes+critics_vote+public_vote,data=filmss)
+summary(model2)
+step(model2)
+
+
+model22<-lm(new_avg_vote~humor+rhythm+erotism+tension+effort+duration+total_votes+critics_vote+public_vote+
+             humor:effort+humor:tension+tension:effort+humor:tension:effort+total_votes:public_vote+total_votes:critics_vote+
+              public_vote:critics_vote+public_vote:critics_vote:total_votes,data=filmss)
+summary(model22)
+step(model22)
+new_model22<- lm(new_avg_vote ~humor+effort+total_votes+public_vote+critics_vote+humor:effort+
+                   total_votes:public_vote+total_votes:critics_vote+public_vote:critics_vote,data = filmss)
+  
+summary(new_model22)
+vif_values <- vif(new_model22)
+
+barplot(vif_values,main = "vif",horiz = T,col = "green")+
+                                    abline(v=5,lwd=3,lty=2)
+
+
+model3 <- lm(new_avg_vote~humor+effort+tension+humor:effort+tension:humor+effort:tension,data=filmss)
+summary(model3)
+
+
+```
+
+# QUESTION 7 
+
+```{r}
+data2 <- filmss %>% subset(genre==c("Horror","Drama","Comedy","Thriller"))
+
+anova <- aov(avg_vote ~genre,data = data2)
+summary(anova)
+
+library(MASS)
+library(onewaytests)
+nor.test(avg_vote ~genre,data=data2)
+aovv<-boxcox(avg_vote~genre,lambda=seq(-1,20,1/10),data=data2)
+lambda<-aovv$x[which.max(aovv$y)]
+lambda 
+
+newaov_avg_vote<-(data2$avg_vote^lambda-1)/lambda
+nor.test(newaov_avg_vote~genre,data=data2)
+anova2<-aov(newaov_avg_vote ~genre,data = data2)
+summary(anova2)
+
+kw.test(avg_vote~genre,data=data2)
+
+
+```
+
+
+
+
+
+
